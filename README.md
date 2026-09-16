@@ -2,7 +2,7 @@
 
 [ブラウザ書き込みページ](https://temesotejam.github.io/M5stackCORES3I2CdemoUWB/) · [ビルドと公開状況](https://github.com/temesotejam/M5stackCORES3I2CdemoUWB/actions)
 
-M5Stack CoreS3から、別途配布した `Type2DK_I2C_Test_v1` スレーブの16バイト応答を読み取る試験アプリです。測距・距離表示は行いません。ハードウェアでの動作は利用環境で確認してください。
+M5Stack CoreS3から、Type2DK診断版v4スレーブの16バイト応答を読み取る試験アプリです。測距・距離表示は行いません。ハードウェアでの動作は利用環境で確認してください。
 
 ## 書き込み
 
@@ -10,14 +10,18 @@ PC版Chrome / Edgeで上のページを開き、CoreS3をUSB接続して書き�
 
 ## 配線
 
-|CoreS3 PORT A|Type2DK|
+|CoreS3 PORT A|Type2DK EVK Rev.4.1・QN9090用TP8|
 |---|---|
-|黄 GPIO2 SDA|PIO13 SWDIO → I2C1 SDA|
-|白 GPIO1 SCL|PIO12 SWCLK → I2C1 SCL|
-|黒 GND|GND|
+|黄 GPIO2 SDA|TP8の2番：PIO13 SWDIO → I2C1 SDA|
+|白 GPIO1 SCL|TP8の4番：PIO12 SWCLK → I2C1 SCL|
+|黒 GND|TP8の3・5・9番のいずれか：GND|
 |赤 5 V|接続しない|
 
-両方を個別にUSB給電し、3.3 VのI/O条件で使用。SDA/SCL各線を3.3 Vにプルアップします。短い配線では2.2～4.7 kΩを出発点として、既存抵抗・バス容量と実際の波形を確認してください。5 Vへプルアップしないでください。2DKのSWD書き込み器は外します。PIO番号は信号名であり評価基板コネクタの穴番号ではありません。
+Rev.4.1回路図の1ページで照合済み。TP14はSR040用で、今回使う端子ではありません。実物の1番表示を確認し、回路図の左右を基板上の向きとして扱わないでください。
+
+両方を個別にUSB給電。PIO12/13の外付けプルアップは基板回路図にありません。SDA/SCL各線を、電圧を確認した2DKのMCU I/O電源（TP18）へ各2.2 kΩでプルアップする構成から試します。最終値は並列抵抗・バス容量・波形で確認。5 Vへは接続しません。2DKのSWD書き込み器は外します。
+
+USB給電経路にはダイオードD1があり、MCU電源を3.3 V固定と扱えません。**TP18（VDD_3V3_MCU）対TP15（GND）の電圧を確認**してください。FT230XはUSBから直接給電されるため、COMポートの出現だけではMCU給電を確認できません。[Rev.4.1の電源・UART・配線の確認](type2dk/README.md#rev41回路図で確認した接続)。
 
 ## 操作と合否
 
