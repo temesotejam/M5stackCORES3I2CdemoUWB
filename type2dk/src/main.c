@@ -1,9 +1,10 @@
-/* Type2DK I2C diagnostic v3: QN9090 USART0 -> onboard FT230X -> USB.
+/* Type2DK I2C diagnostic v4: QN9090 USART0 -> onboard FT230X -> USB.
  * Own code; requires the user's QN9090 SDK headers to build.
  * I2C test format is unchanged from v1. No UWB, BLE or flash writes.
  */
 #include "QN9090.h"
 #include "i2c_response.h"
+#include "i2c_pins.h"
 static uint32_t tick_ms, beat;
 static int uart_ready, i2c_ready;
 
@@ -80,7 +81,7 @@ static void registers(void) {
 static void heartbeat(void) {
     /* Aligned 32-bit reads are atomic, but counters are independently sampled;
        this log is for activity diagnosis, not a transactional frame audit. */
-    puts_uart("STATE,v=3,beat=");dec(++beat);
+    puts_uart("STATE,v=4,beat=");dec(++beat);
     puts_uart(",ready=");dec((uint32_t)i2c_ready);
     puts_uart(",irq=");dec(irq_count);
     puts_uart(",read_addr=");dec(reads);
@@ -118,19 +119,18 @@ void app_main(void) {
     SysTick->LOAD=31999;SysTick->VAL=0;
     SysTick->CTRL=SysTick_CTRL_CLKSOURCE_Msk|SysTick_CTRL_ENABLE_Msk; /* no IRQ */
     uart_init();
-    puts_uart("BOOT,2DK_I2C_DIAG_V3,baud=115200,format=8N1,reset_cause=");hex(PMC->RESETCAUSE);puts_uart("\r\n");
+    puts_uart("BOOT,2DK_I2C_DIAG_V4,baud=115200,format=8N1,reset_cause=");hex(PMC->RESETCAUSE);puts_uart("\r\n");
     puts_uart("BOOT,waiting_before_SWD_to_I2C\r\n");
     wait_ms(2000);
-    puts_uart("INIT,I2C1,addr=0x42,SCL=PIO12,SDA=PIO13\r\n");
+    puts_uart("INIT,I2C1,addr=0x42,SCL=PIO12,SDA=PIO13,FUNC=5\r\n");
     SYSCON->I2CCLKSEL=0;
     SYSCON->AHBCLKCTRLSET[1]=SYSCON_AHBCLKCTRL1_I2C1_MASK;
     SYSCON->PRESETCTRLSET[1]=SYSCON_PRESETCTRL1_I2C1_RST_MASK;
     while(!(SYSCON->PRESETCTRL[1]&SYSCON_PRESETCTRL1_I2C1_RST_MASK)) {}
     SYSCON->PRESETCTRLCLR[1]=SYSCON_PRESETCTRL1_I2C1_RST_MASK;
     while(SYSCON->PRESETCTRL[1]&SYSCON_PRESETCTRL1_I2C1_RST_MASK) {}
-    const uint32_t config=IOCON_PIO_FUNC(4)|IOCON_PIO_MODE(2)|IOCON_PIO_DIGIMODE(1)
-        |IOCON_PIO_FILTEROFF(1)|IOCON_PIO_OD(1);
-    IOCON->PIO[0][12]=config;IOCON->PIO[0][13]=config;
+    const uint32_t config=type2dk_i2c_pin_config();
+    type2dk_i2c_configure_pins();
     FLEXCOMM3->PSELID=FLEXCOMM_PSELID_PERSEL(3);
     I2C1->CFG=0;I2C1->CLKDIV=8;I2C1->SLVADR[0]=ADDRESS<<1;
     for(unsigned n=1;n<4;n++) I2C1->SLVADR[n]=1;

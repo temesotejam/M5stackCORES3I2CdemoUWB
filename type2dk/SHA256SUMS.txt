@@ -1,1 +1,1 @@
-8579a0a0cf3d9ef1647cbc173f114f229a12e163b60e6ddbcaa57f7aead621a1  2dk_i2c_diag_v3.bin
+428de5c6b2685d011f6ef1b8b6e8f012133fcd0c17e8ebf69d7f801a84d557fb  2dk_i2c_diag_v4.bin

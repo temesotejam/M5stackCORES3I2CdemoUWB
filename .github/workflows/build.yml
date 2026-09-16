@@ -29,6 +29,8 @@ jobs:
           /tmp/protocol_test
           gcc -std=c11 -Wall -Wextra -Werror test/slave_response_test.c -o /tmp/slave_test
           /tmp/slave_test
+          gcc -std=c11 -Wall -Wextra -Werror test/slave_pinmux_test.c -o /tmp/slave_pinmux_test
+          /tmp/slave_pinmux_test
       - name: Build CoreS3 firmware
         run: pio run
       - name: Package browser firmware

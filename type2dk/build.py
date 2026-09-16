@@ -28,6 +28,6 @@ assert 0x04000400 < sp <= 0x04008000
 assert reset & 1 and 0x120 <= (reset & ~1) < off
 irq=struct.unpack_from('<I',b,30*4)[0]
 assert irq & 1 and 0x120 <= (irq & ~1) < off
-out=root/'2dk_i2c_diag_v3.bin'; out.write_bytes(b); raw.unlink()
+out=root/'2dk_i2c_diag_v4.bin'; out.write_bytes(b); raw.unlink()
 (root/'SHA256SUMS.txt').write_text(hashlib.sha256(b).hexdigest()+'  '+out.name+'\n')
 print('Build and ROM-header checks passed:',len(b),'bytes')
