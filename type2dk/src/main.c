@@ -1,4 +1,4 @@
-/* Type2DK I2C diagnostic v2: QN9090 USART0 -> onboard FT230X -> USB.
+/* Type2DK I2C diagnostic v3: QN9090 USART0 -> onboard FT230X -> USB.
  * Own code; requires the user's QN9090 SDK headers to build.
  * I2C test format is unchanged from v1. No UWB, BLE or flash writes.
  */
@@ -71,12 +71,16 @@ static void registers(void) {
     puts_uart(",clock_gate=");hex(SYSCON->AHBCLKCTRL[1]);
     puts_uart(",reset=");hex(SYSCON->PRESETCTRL[1]);
     puts_uart(",retention=");hex(SYSCON->RETENTIONCTRL);
+    puts_uart(",async_bridge=");hex(SYSCON->ASYNCAPBCTRL);
+    puts_uart(",async_clock=");hex(ASYNC_SYSCON->ASYNCAPBCLKSELA);
+    puts_uart(",uart_cfg=");hex(USART0->CFG);
+    puts_uart(",uart_fifo=");hex(USART0->FIFOSTAT);
     puts_uart("\r\n");
 }
 static void heartbeat(void) {
     /* Aligned 32-bit reads are atomic, but counters are independently sampled;
        this log is for activity diagnosis, not a transactional frame audit. */
-    puts_uart("STATE,v=2,beat=");dec(++beat);
+    puts_uart("STATE,v=3,beat=");dec(++beat);
     puts_uart(",ready=");dec((uint32_t)i2c_ready);
     puts_uart(",irq=");dec(irq_count);
     puts_uart(",read_addr=");dec(reads);
@@ -98,14 +102,23 @@ void app_fault(void) {
     for(;;) __NOP();
 }
 void app_main(void) {
+    /* Match SDK CLOCK_EnableClock(kCLOCK_Fro32M) before selecting FRO32M. */
+    PMC->FRO192M |= PMC_FRO192M_DIVSEL(1u << 1);
     SYSCON->MAINCLKSEL=3;SYSCON->AHBCLKDIV=0;
     SYSCON->OSC32CLKSEL&=~SYSCON_OSC32CLKSEL_SEL32MHZ_MASK;
+    /* SDK BOARD_BootClockRUN enables the asynchronous APB bridge before
+       initializing peripherals. USART0 lives at 0x4008B000. An access with
+       its bus clock unavailable can stall before any BOOT log or I2C init.
+       Do this before uart_init, not merely before the I2C setup. */
+    SYSCON->ASYNCAPBCTRL |= SYSCON_ASYNCAPBCTRL_ENABLE_MASK;
+    ASYNC_SYSCON->ASYNCAPBCLKSELA=ASYNC_SYSCON_ASYNCAPBCLKSELA_SEL(0);
+    __DSB();
     SYSCON->AHBCLKCTRLSET[0]=SYSCON_AHBCLKCTRL0_IOCON_MASK;
     SYSCON->SYSTICKCLKDIV=0;
     SysTick->LOAD=31999;SysTick->VAL=0;
     SysTick->CTRL=SysTick_CTRL_CLKSOURCE_Msk|SysTick_CTRL_ENABLE_Msk; /* no IRQ */
     uart_init();
-    puts_uart("BOOT,2DK_I2C_DIAG_V2,baud=115200,format=8N1,reset_cause=");hex(PMC->RESETCAUSE);puts_uart("\r\n");
+    puts_uart("BOOT,2DK_I2C_DIAG_V3,baud=115200,format=8N1,reset_cause=");hex(PMC->RESETCAUSE);puts_uart("\r\n");
     puts_uart("BOOT,waiting_before_SWD_to_I2C\r\n");
     wait_ms(2000);
     puts_uart("INIT,I2C1,addr=0x42,SCL=PIO12,SDA=PIO13\r\n");
