@@ -2,3 +2,7 @@
 __pycache__/
 site/
 *.o
+
+type2dk/*.elf
+type2dk/*.bin
+type2dk/*.raw

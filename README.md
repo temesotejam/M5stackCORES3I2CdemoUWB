@@ -77,3 +77,22 @@ mainへのpushでフレーム検証・ファームウェアビルド・成果物
 - [M5Stack CoreS3公式仕様・配線・ダウンロードモード](https://docs.m5stack.com/en/core/CoreS3)
 - [M5Unified I2C API](https://github.com/m5stack/M5Unified/blob/master/src/utility/I2C_Class.hpp)
 - [ESP Web Tools](https://esphome.github.io/esp-web-tools/)
+
+## 診断版 v1.1.0
+
+外部PORT AのみをEspressif ESP-IDFのI2Cドライバへ変更。M5Unifiedの内部バスと別コントローラであることを検査してから外部バスを引き継ぎます。これにより旧版のbool型にまとめられていたエラーを数値で取得します。旧版との通信実装比較も兼ねる診断変更で、実機での解決は未確認です。16バイト形式はv1互換です。2DKのUSBログが必要な場合は下記の診断版v2へ書き換えます。
+
+起動5秒後に自動PROBE、毎秒STATとDIAGを出力。USBで `p` を送信すると再PROBEできます。PROBEは書き込みアドレスのみ送ってSTOPし、レジスタやデータを書き込みません。
+
+- `NO_ACK` / `ESP_FAIL`：スレーブのACKを受け取れなかった。正常な生存・配線・電気条件を保証しない。
+- `TIMEOUT`：バスが時間内に完了しなかった。信号線Low、スレーブの応答待ち、ドライバなどを切り分ける。
+- `BAD_FRAME`：I2C転送は完了したが2DKIの内容に不一致。
+- `INIT_FAIL`：外部バスの初期化失敗。`init`でドライバのエラー名を確認。
+- `before / after / idle`：SDA/SCLのデジタル値。1/1でも外部プルアップの有無・電圧・波形・接続先を証明できない。
+- `nack / timeout / other`：速度別の読み取り失敗数。PROBEはSTATに含めない。
+
+100 kHzで約10秒動かし、PROBEとDIAGの行を採取してください。内部の弱いプルアップも有効ですが400 kHz試験の外付け抵抗を代用する前提にはしません。
+
+[ESP-IDF v4.4.7 I2C API](https://docs.espressif.com/projects/esp-idf/en/v4.4.7/esp32s3/api-reference/peripherals/i2c.html)
+
+2DK側にもUSBログを追加した診断版v2を同梱しました。[書き込みとログの説明](type2dk/README.md)を参照してください。
