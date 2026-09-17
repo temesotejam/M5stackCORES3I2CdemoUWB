@@ -15,8 +15,11 @@ class ExternalI2C {
     config.mode = I2C_MODE_MASTER;
     config.sda_io_num = GPIO_NUM_2;
     config.scl_io_num = GPIO_NUM_1;
-    config.sda_pullup_en = GPIO_PULLUP_ENABLE;
-    config.scl_pullup_en = GPIO_PULLUP_ENABLE;
+    // Use external resistors to the slave's measured I/O rail (TP18: 3.0 V).
+    // Internal pull-ups would also bias these lines toward CoreS3's 3.3 V rail.
+    // This applies at startup and whenever the 100/400 kHz setting changes.
+    config.sda_pullup_en = GPIO_PULLUP_DISABLE;
+    config.scl_pullup_en = GPIO_PULLUP_DISABLE;
     config.master.clk_speed = hz;
     const esp_err_t err = i2c_param_config(port, &config);
     if (err == ESP_OK) clock = hz;
