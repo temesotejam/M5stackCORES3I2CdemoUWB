@@ -1,52 +1,78 @@
-# Type2DK I2C + USB UART diagnostic v4
+# Type2DK I2C + USB UART diagnostic v5
 
-QN9090用。Type2DK Rev.4.1での試験を想定した、実機未検証の診断版です。UWB測距・BLE・省電力処理なし。Flash/OTP/校正値を書き換える処理はありません。書き込み操作により既存アプリは置き換わります。
+QN9090用。Type2DK Rev.4.1ではv4のアプリ実行・USBログまでユーザーの実機ログで確認済みです。v5の起動とI2C通信は未検証です。UWB測距・BLE・省電力処理なし。Flash/OTP/校正値を書き換える処理はありません。書き込み操作により既存アプリは置き換わります。
+
+## v5：信号到達とI2C処理を分けて調べる診断版
+
+提供されたv4ログでは、`beat`増加、PIO12/13=`0x595`、CFG=`2`、SLVADR0=`0x84`、I2C1クロックゲート有効、I2C1リセット解除を確認。`ready=0`になる直接の理由は、期待値3に対して`PSELID=0`だったことです。
+
+**v4はready=0でもI2Cを停止しません。readyの表示だけ直してもNO_ACKが直る根拠はありません。** `QN9090.h`の`I2C_Type`ではオフセット0xFF8が予約領域で、0xFFCがIDです。一方、同梱の汎用FLEXCOMMドライバはPSELIDを操作します。今回の資料とログだけでPSELID=0を「I2Cが使えない原因」と断定しません。v5ではv4のready条件を比較用に残し、CHECKで各項目を別々に表示します。
+
+v5は通信成功を確認した修正版ではなく、次の切り分けに必要な観測を追加したBINです。アドレス・応答・FUNC5・I2C設定・割り込みハンドラはv4から維持します。
+
+1. CoreS3 1.1.0を100 kHz / RUNで動かしておきます。既存の2 kΩプルアップはそのままで構いません。
+2. 下のv5を書き込み、2DKのCOMを115200 bps / 8N1 / フロー制御なしで開き、SW1を1回押します。
+3. 起動から約2秒後、PIO12/13を一時的に**出力しないGPIO入力**として3秒間観測します。この間のNO_ACKは予定された動作です。
+4. 続いてFUNC5のI2C1スレーブへ切り替えます。`LINES,mode=GPIO_INPUT`の3行、最初の`CHECK`・`REG`、その後の`STATE`・`LINES,mode=I2C1_FUNC5`を採取します。
+5. 通信が成立したら、起動中の失敗をCLEARしてから100 kHz、次に400 kHzを試します。
+
+| 観測 | 次に絞り込めること |
+|---|---|
+| GPIO_INPUTでscl_changesとsda_changesが増える | 少なくとも両ピンの電圧変化を2DK側でも検出。正しいI2C波形・アドレスを保証するものではない |
+| CoreS3がRUNでもGPIO_INPUTの変化が両方0 | 停止中・配線違い・導通・信号レベルを優先確認。ポーリングでの未検出なので断線とは断定しない |
+| GPIO入力で変化があり、I2Cではread_addr/write_addr/irqが0 | FUNC5入力経路・I2C設定・実際のアドレス波形の調査へ |
+| STATのSLVPENDINGが立つのにirqが0 | INTENSET、NVIC、PRIMASK/BASEPRI/FAULTMASK、ベクタを確認 |
+| CoreS3のOKと2DKのread_addr/tx_bytesが増える | フレーム受信が成立。400 kHzと波形の確認へ |
+
+`LINES`のchangesはポーリングで見えた状態変化数です。全エッジ数、SCL周波数、立ち上がり時間、I2Cデコードではありません。GPIO_INPUTとI2C1_FUNC5で入力経路が異なる可能性もあるため、まずGPIO_INPUTの結果を見ます。各ログ区間でカウンタをリセットします。
 
 ## v4で修正した不具合
 
-**v1〜v3ではPIO12・PIO13のピン機能をFUNC4（PWM0/PWM2）に設定していました。正しくはFUNC5（I2C1_SCL/I2C1_SDA）です。旧版はI2C試験に使わず、v4へ更新してください。**
+**v1〜v3ではPIO12・PIO13のピン機能をFUNC4（PWM0/PWM2）に設定していました。正しくはFUNC5（I2C1_SCL/I2C1_SDA）です。旧版はI2C試験に使わず、FUNC5を引き継いだv5へ更新してください。**
 
 NXP公式の機能番号表を確認し、両ピンをFUNC5へ修正しました。これまでの`ready=1`は設定した誤った値の読み戻しにも成功するため、この間違いを検出できていませんでした。v4では実際のピン設定処理を、公式表で指定された機能番号と照合する回帰テストを追加しています。
 
-[調査結果と一次資料](PIO12_PIO13_I2C_audit.md)。物理配線・400 kHz通信・USBログの実機確認は未完了です。
+[調査結果と一次資料](PIO12_PIO13_I2C_audit.md)。v4のUSBログは確認済み。I2CのACK・データ受信・400 kHz通信は未確認です。
 
 ## ダウンロードと書き込み
 
-[2dk_i2c_diag_v4.bin](https://temesotejam.github.io/M5stackCORES3I2CdemoUWB/firmware/2dk_i2c_diag_v4.bin)
+[2dk_i2c_diag_v5.bin](https://temesotejam.github.io/M5stackCORES3I2CdemoUWB/firmware/2dk_i2c_diag_v5.bin)
 
 Tera Termなどで2DKのCOMポートを開いている場合は閉じ、BINをDK6Programmer.exeと同じフォルダへ置いて実行します。COM22は例で、CoreS3のCOMと混同せず実際の2DKの番号へ変更してください。
 
 ```powershell
-.\DK6Programmer.exe -V 0 -P 1000000 -s COM22 -Y -v -p .\2dk_i2c_diag_v4.bin
+.\DK6Programmer.exe -V 0 -P 1000000 -s COM22 -Y -v -p .\2dk_i2c_diag_v5.bin
 ```
 
 `-v`は書き込んだFlashの照合です。書き込み・照合・コマンド終了を確認後、2DKのUSBシリアルを **115200 bps / 8N1 / フロー制御なし** で開きます。以前の測距版の3000000 bpsとは異なります。通常は書き込み完了時にリセットされます。起動ログを取り直す場合は、ターミナルを開いてからQN9090側のMCU RESETを短く1回押します。Rev.4.1回路図での部品番号はSW1です。基板上の位置は実物の表示で確認してください。
 
 1. 最初は2DK単体でUSBログを確認できます。I2CをつながなくてもSTATEが出る構成です。
-2. `STATE,v=4,...ready=1...`が出たらCoreS3とSDA/SCL/GNDを接続して両方を給電します。配線変更時は双方の電源を切ってください。
+2. 上記の観測を行う場合はCoreS3を100 kHz / RUNにして2DKをリセットします。配線変更時は双方の電源を切ってください。readyだけで起動失敗と判断せずCHECKの項目を見ます。
 3. CoreS3でPROBEし、両方のログを採取します。
 
-## 今回の「2DKログなし / CoreS3両線Low」の確認
+## 過去の「2DKログなし / CoreS3両線Low」の確認（現在はUARTログあり）
 
 1. 双方の電源を切り、機器間のSDA・SCL・GNDとSWD書き込み器を外します。2DKだけをUSBでPCにつなぎます。
-2. v4を上記コマンドで書き込み、照合成功を確認します。
-3. 2DKのCOMを115200 bps / 8N1 / フロー制御なしで開きます。`STATE,v=4`が定期的に出るか確認します。
+2. v5を上記コマンドで書き込み、照合成功を確認します。
+3. 2DKのCOMを115200 bps / 8N1 / フロー制御なしで開きます。`STATE,v=5`が定期的に出るか確認します。
 4. 別途CoreS3のPORT Aを未接続にして再起動し、最初の5秒間の`DIAG`の`idle`を確認します。内部プルアップを有効にしているため、外部接続がなければ1/1が期待値です。これは400 kHzで外付け抵抗が不要という意味ではありません。
 
 2DK単体でもログが出ない場合はDK6Programmerの書き込み・照合結果を確認します。CoreS3単体でも0/0の場合は、2DK以外にもGPIO設定・基板・計測を調べる必要があります。
 
 ## ログの意味
 
-以下は出力形式の説明で、実測結果ではありません。
+以下はv5の出力形式の説明で、実測結果ではありません。
 
-- `BOOT,2DK_I2C_DIAG_V4,...`：アプリ本体へ到達してUARTを初期化した。
+- `BOOT,2DK_I2C_DIAG_V5,...`：アプリ本体へ到達してUARTを初期化した。
 - `INIT,I2C1,...`：I2C初期化を開始する。
-- `READY,I2C1_CONFIG_READBACK_OK`：ピン機能・I2C選択・スレーブ有効・アドレスのレジスタ読み戻しが一致。バス通信成功の意味ではない。
+- `CHECK,...`：pins/slave/address/clock_gate/reset_released/irq_enable/nvic_enable/unmasked/psel_matchを個別に表示。psel_match以外は1を期待。psel_matchの必須性は未確定。
+- `INFO,ready_uses_v4_checks,PSELID_expectation_unconfirmed`：readyはv4のPSELID判定を含む比較用の値。ready=0だけを通信停止の原因と扱わない。
+- `LINES,...`：2DK側のSCL/SDAの値、Lowを観測した回数、観測できた変化数。
 - `REG,...`：ピン設定、I2Cレジスタ、クロックゲート、リセット、I/O保持状態、APBブリッジ・クロック、UART設定を起動時と5回ごとに出力。
-- `STATE,v=4,beat=...,ready=...,irq=...,read_addr=...,write_addr=...,tx_bytes=...,write_bytes=...,deselect=...,stat=...,last_irq=...,irq_pending=...`：約1秒間隔の活動ログ。各カウンタは独立に読むため同一瞬間の値とは限らない。
+- `STATE,v=5,beat=...,ready=...,irq=...,read_addr=...,write_addr=...,tx_bytes=...,write_bytes=...,deselect=...,stat=...,last_irq=...,irq_pending=...`：約1秒間隔の活動ログ。各カウンタは独立に読むため同一瞬間の値とは限らない。
 - `FAULT,...`：UART初期化後に既定の例外ハンドラへ入った場合の例外番号・Faultレジスタ。これより前の停止は出力できない。
 
-`beat`が増えればメインループは動いています。PROBEでは`write_addr`が増える想定。16バイトREADでは`read_addr`と`tx_bytes`が増える想定です。読み取り途中の中断でもread_addrは増え、tx_bytesはFIFOへの設定数なので、マスターが正しく受信した数そのものではありません。
+`beat`が増えればメインループは動いています。PROBEでは`write_addr`が増える想定。16バイトREADでは`read_addr`と`tx_bytes`が増える想定です。読み取り途中の中断でもread_addrは増え、tx_bytesは送信データレジスタへの設定数なので、マスターが正しく受信した数そのものではありません。
 
 ログが出ないだけでは「MCUが起動していない」と断定できません。COM番号、115200/8N1/フロー制御なし、Flash照合、UART経路も候補です。全レジスタの読み戻しが正常でも、配線・プルアップ・波形は別確認です。
 
@@ -57,7 +83,7 @@ Tera Termなどで2DKのCOMポートを開いている場合は閉じ、BINをDK
 - 各信号を、電圧を確認した2DKのMCU I/O電源（TP18）に外付けプルアップ。CoreS3 PORT Aの赤5 Vは接続しない。電源経路にD1があるため、USB給電でもMCU電圧を3.3 V固定と扱わない。
 - 2DKの既存PIO8/PIO9 USART0とFT230Xの経路からUSBログを出す。追加のUART線は不要。
 - UARTは割り込みハンドラ内から出力しない。I2C割り込みを有効にしたままメインループで出す。
-- 起動約2秒後にSWDピンをI2Cへ転用。既存SWD書き込み器は外す。
+- 起動約2秒後にSWDピンをGPIO入力へ切替え、3秒観測後にI2Cへ転用。既存SWD書き込み器は外す。
 - v1と同じ0x42・16バイト2DKI・XOR形式。CoreS3 v1.0.0とも互換。
 - v3から引き継ぐ起動処理：SDKの `BOARD_BootClockRUN` / `CLOCK_EnableAPBBridge` と照合して、UARTにアクセスする前の非同期APBブリッジ有効化を追加。FRO32Mも選択前に明示的に有効化します。このクロック修正だけでは、今回特定したFUNC4の誤りは解消されていませんでした。
 - CoreS3は既存の1.1.0のままで確認できます。

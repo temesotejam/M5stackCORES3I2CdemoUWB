@@ -1,4 +1,4 @@
-/* Type2DK I2C diagnostic v4: QN9090 USART0 -> onboard FT230X -> USB.
+/* Type2DK I2C diagnostic v5: QN9090 USART0 -> onboard FT230X -> USB.
  * Own code; requires the user's QN9090 SDK headers to build.
  * I2C test format is unchanged from v1. No UWB, BLE or flash writes.
  */
@@ -7,9 +7,25 @@
 #include "i2c_pins.h"
 static uint32_t tick_ms, beat;
 static int uart_ready, i2c_ready;
+static int observe_lines;
+static uint32_t line_samples, scl_low, sda_low, scl_changes, sda_changes, last_pins;
+
+static void sample_lines(void) {
+    if(!observe_lines) return;
+    const uint32_t pins=GPIO->PIN[0];
+    if(line_samples) {
+        if((pins^last_pins)&(1u<<12)) ++scl_changes;
+        if((pins^last_pins)&(1u<<13)) ++sda_changes;
+    }
+    if(!(pins&(1u<<12))) ++scl_low;
+    if(!(pins&(1u<<13))) ++sda_low;
+    last_pins=pins;
+    ++line_samples;
+}
 
 static void poll_tick(void) {
     if(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) ++tick_ms;
+    sample_lines();
 }
 static void wait_ms(uint32_t delay) {
     uint32_t start=tick_ms;
@@ -68,6 +84,14 @@ static void registers(void) {
     puts_uart(",pselid=");hex(FLEXCOMM3->PSELID);
     puts_uart(",cfg=");hex(I2C1->CFG);
     puts_uart(",addr0=");hex(I2C1->SLVADR[0]);
+    puts_uart(",id=");hex(I2C1->ID);
+    puts_uart(",inten=");hex(I2C1->INTENSET);
+    puts_uart(",intstat=");hex(I2C1->INTSTAT);
+    puts_uart(",i2c_clksel=");hex(SYSCON->I2CCLKSEL);
+    puts_uart(",osc32_clksel=");hex(SYSCON->OSC32CLKSEL);
+    puts_uart(",gpio_clock_gate=");hex(SYSCON->AHBCLKCTRL[0]);
+    puts_uart(",gpio_reset=");hex(SYSCON->PRESETCTRL[0]);
+    puts_uart(",gpio_dir=");hex(GPIO->DIR[0]);
     puts_uart(",clkdiv=");dec(I2C1->CLKDIV);
     puts_uart(",clock_gate=");hex(SYSCON->AHBCLKCTRL[1]);
     puts_uart(",reset=");hex(SYSCON->PRESETCTRL[1]);
@@ -76,12 +100,44 @@ static void registers(void) {
     puts_uart(",async_clock=");hex(ASYNC_SYSCON->ASYNCAPBCLKSELA);
     puts_uart(",uart_cfg=");hex(USART0->CFG);
     puts_uart(",uart_fifo=");hex(USART0->FIFOSTAT);
+    puts_uart(",vtor=");hex(SCB->VTOR);
+    puts_uart(",primask=");dec(__get_PRIMASK());
+    puts_uart(",basepri=");dec(__get_BASEPRI());
+    puts_uart(",faultmask=");dec(__get_FAULTMASK());
+    puts_uart("\r\n");
+}
+static void line_report(const char *mode) {
+    /* Snapshot before printing: logging itself calls poll_tick. Counts are
+       sampled observations, NOT complete edge counts or clock measurements. */
+    const uint32_t samples=line_samples, cl=scl_low, dl=sda_low;
+    const uint32_t cc=scl_changes, dc=sda_changes, pins=GPIO->PIN[0];
+    line_samples=scl_low=sda_low=scl_changes=sda_changes=0;
+    puts_uart("LINES,mode=");puts_uart(mode);
+    puts_uart(",scl=");dec((pins>>12)&1u);
+    puts_uart(",sda=");dec((pins>>13)&1u);
+    puts_uart(",samples=");dec(samples);
+    puts_uart(",scl_low=");dec(cl);puts_uart(",sda_low=");dec(dl);
+    puts_uart(",scl_changes=");dec(cc);puts_uart(",sda_changes=");dec(dc);
+    puts_uart("\r\n");
+}
+static void checks(void) {
+    const uint32_t config=type2dk_i2c_pin_config();
+    const uint32_t mask=I2C_INTENSET_SLVPENDINGEN_MASK|I2C_INTENSET_SLVDESELEN_MASK;
+    puts_uart("CHECK,pins=");dec(IOCON->PIO[0][12]==config && IOCON->PIO[0][13]==config);
+    puts_uart(",slave=");dec(I2C1->CFG==I2C_CFG_SLVEN_MASK);
+    puts_uart(",address=");dec(I2C1->SLVADR[0]==(ADDRESS<<1));
+    puts_uart(",clock_gate=");dec((SYSCON->AHBCLKCTRL[1]&SYSCON_AHBCLKCTRL1_I2C1_MASK)!=0);
+    puts_uart(",reset_released=");dec((SYSCON->PRESETCTRL[1]&SYSCON_PRESETCTRL1_I2C1_RST_MASK)==0);
+    puts_uart(",irq_enable=");dec((I2C1->INTENSET&mask)==mask);
+    puts_uart(",nvic_enable=");dec((NVIC->ISER[0]&(1u<<FLEXCOMM3_IRQn))!=0);
+    puts_uart(",unmasked=");dec(!__get_PRIMASK() && !__get_BASEPRI() && !__get_FAULTMASK());
+    puts_uart(",psel_match=");dec((FLEXCOMM3->PSELID&FLEXCOMM_PSELID_PERSEL_MASK)==3);
     puts_uart("\r\n");
 }
 static void heartbeat(void) {
     /* Aligned 32-bit reads are atomic, but counters are independently sampled;
        this log is for activity diagnosis, not a transactional frame audit. */
-    puts_uart("STATE,v=4,beat=");dec(++beat);
+    puts_uart("STATE,v=5,beat=");dec(++beat);
     puts_uart(",ready=");dec((uint32_t)i2c_ready);
     puts_uart(",irq=");dec(irq_count);
     puts_uart(",read_addr=");dec(reads);
@@ -107,21 +163,28 @@ void app_main(void) {
     PMC->FRO192M |= PMC_FRO192M_DIVSEL(1u << 1);
     SYSCON->MAINCLKSEL=3;SYSCON->AHBCLKDIV=0;
     SYSCON->OSC32CLKSEL&=~SYSCON_OSC32CLKSEL_SEL32MHZ_MASK;
-    /* SDK BOARD_BootClockRUN enables the asynchronous APB bridge before
-       initializing peripherals. USART0 lives at 0x4008B000. An access with
-       its bus clock unavailable can stall before any BOOT log or I2C init.
-       Do this before uart_init, not merely before the I2C setup. */
+    /* Retain the SDK-style APB bridge setup from v4. This is not evidence
+       that USART0 is on this bridge or that v3 fixed the earlier silence. */
     SYSCON->ASYNCAPBCTRL |= SYSCON_ASYNCAPBCTRL_ENABLE_MASK;
     ASYNC_SYSCON->ASYNCAPBCLKSELA=ASYNC_SYSCON_ASYNCAPBCLKSELA_SEL(0);
     __DSB();
-    SYSCON->AHBCLKCTRLSET[0]=SYSCON_AHBCLKCTRL0_IOCON_MASK;
+    SYSCON->AHBCLKCTRLSET[0]=SYSCON_AHBCLKCTRL0_IOCON_MASK|SYSCON_AHBCLKCTRL0_GPIO_MASK;
     SYSCON->SYSTICKCLKDIV=0;
     SysTick->LOAD=31999;SysTick->VAL=0;
     SysTick->CTRL=SysTick_CTRL_CLKSOURCE_Msk|SysTick_CTRL_ENABLE_Msk; /* no IRQ */
     uart_init();
-    puts_uart("BOOT,2DK_I2C_DIAG_V4,baud=115200,format=8N1,reset_cause=");hex(PMC->RESETCAUSE);puts_uart("\r\n");
+    puts_uart("BOOT,2DK_I2C_DIAG_V5,baud=115200,format=8N1,reset_cause=");hex(PMC->RESETCAUSE);puts_uart("\r\n");
     puts_uart("BOOT,waiting_before_SWD_to_I2C\r\n");
     wait_ms(2000);
+    /* First observe the physical pins as GPIO inputs. No pin drives Low or
+       High in this phase, and there is no I2C slave to ACK until INIT below.
+       With CoreS3 already running at 100 kHz this separates signal delivery
+       from the FUNC5 peripheral route. */
+    type2dk_i2c_observe_pins();
+    observe_lines=1;
+    puts_uart("OBSERVE,GPIO_INPUT,seconds=3,no_ACK_expected\r\n");
+    for(unsigned n=0;n<3;n++) {wait_ms(1000);line_report("GPIO_INPUT");}
+    observe_lines=0;
     puts_uart("INIT,I2C1,addr=0x42,SCL=PIO12,SDA=PIO13,FUNC=5\r\n");
     SYSCON->I2CCLKSEL=0;
     SYSCON->AHBCLKCTRLSET[1]=SYSCON_AHBCLKCTRL1_I2C1_MASK;
@@ -142,7 +205,16 @@ void app_main(void) {
         && (FLEXCOMM3->PSELID&FLEXCOMM_PSELID_PERSEL_MASK)==3
         && (I2C1->CFG&I2C_CFG_SLVEN_MASK)!=0 && I2C1->SLVADR[0]==(ADDRESS<<1));
     __DSB();__enable_irq();
-    puts_uart(i2c_ready?"READY,I2C1_CONFIG_READBACK_OK\r\n":"ERROR,I2C1_CONFIG_READBACK_FAILED\r\n");
-    registers();
-    for(;;) {heartbeat();wait_ms(1000);if(beat%5u==0) registers();}
+    /* Preserve v4's ready calculation for comparison. A PSELID mismatch
+       alone is NOT established proof that the I2C slave is disabled:
+       QN9090.h leaves 0xFF8 reserved in I2C_Type, while the generic
+       FLEXCOMM driver accesses it. Do not silently turn ready into 1. */
+    puts_uart("INFO,ready_uses_v4_checks,PSELID_expectation_unconfirmed\r\n");
+    checks();registers();
+    line_samples=scl_low=sda_low=scl_changes=sda_changes=0;
+    observe_lines=1;
+    for(;;) {
+        heartbeat();wait_ms(1000);line_report("I2C1_FUNC5");
+        if(beat%5u==0) {checks();registers();}
+    }
 }

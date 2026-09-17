@@ -15,3 +15,11 @@ static inline void type2dk_i2c_configure_pins(void) {
     IOCON->PIO[0][12]=config;
     IOCON->PIO[0][13]=config;
 }
+static inline void type2dk_i2c_observe_pins(void) {
+    /* Disable both GPIO outputs before selecting GPIO; no test pulses. */
+    GPIO->DIRCLR[0]=(1u<<12)|(1u<<13);
+    const uint32_t input=IOCON_PIO_FUNC(0)|IOCON_PIO_MODE(2)
+        |IOCON_PIO_DIGIMODE(1)|IOCON_PIO_FILTEROFF(1);
+    IOCON->PIO[0][12]=input;
+    IOCON->PIO[0][13]=input;
+}

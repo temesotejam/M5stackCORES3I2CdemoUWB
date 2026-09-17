@@ -20,7 +20,7 @@ print('Packaged',version,digest)
 
 # Preserve a build-checked target image without redistributing the licensed SDK.
 # Physical boot and I2C operation still require a board test.
-slave_name='2dk_i2c_diag_v4.bin'
+slave_name='2dk_i2c_diag_v5.bin'
 slave=base64.b64decode(''.join((root/'type2dk'/f'{slave_name}.b64').read_text().split()),validate=True)
 expected=(root/'type2dk/SHA256SUMS.txt').read_text().split()[0]
 assert hashlib.sha256(slave).hexdigest()==expected, '2DK hash mismatch'
@@ -33,4 +33,4 @@ assert struct.unpack_from('<I',slave,image_info)[0]==0xBB0110BB
 assert struct.unpack_from('<I',slave,image_info+12)[0]==len(slave)
 (out/slave_name).write_bytes(slave)
 with (out/'SHA256SUMS').open('a') as f: f.write(expected+'  '+slave_name+'\n')
-print('Verified 2DK v4:',len(slave),'bytes',expected)
+print('Verified 2DK v5:',len(slave),'bytes',expected)
