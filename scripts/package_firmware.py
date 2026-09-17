@@ -34,3 +34,31 @@ assert struct.unpack_from('<I',slave,image_info+12)[0]==len(slave)
 (out/slave_name).write_bytes(slave)
 with (out/'SHA256SUMS').open('a') as f: f.write(expected+'  '+slave_name+'\n')
 print('Verified 2DK v5:',len(slave),'bytes',expected)
+
+# UART is an additional installer; retain the proven I2C test and its downloads.
+build=root/'.pio/build/cores3_uart'
+merged=out/'cores3-uart-merged.bin'
+subprocess.run([sys.executable,str(packages/'tool-esptoolpy/esptool.py'),'--chip','esp32s3','merge_bin','-o',str(merged),'--flash_mode','dio','--flash_freq','80m','--flash_size','16MB','0x0',str(build/'bootloader.bin'),'0x8000',str(build/'partitions.bin'),'0xe000',str(packages/'framework-arduinoespressif32/tools/partitions/boot_app0.bin'),'0x10000',str(build/'firmware.bin')],check=True)
+version='1.2.0-uart+'+a.sha[:7]
+digest=hashlib.sha256(merged.read_bytes()).hexdigest()
+manifest={'name':'CoreS3 Type2DK UART RX Test','version':version,'new_install_prompt_erase':True,'new_install_improv_wait_time':0,'builds':[{'chipFamily':'ESP32-S3','parts':[{'path':'firmware/cores3-uart-merged.bin','offset':0}]}]}
+(site/'manifest-uart.json').write_text(json.dumps(manifest,indent=2)+'\n')
+(site/'build-info-uart.json').write_text(json.dumps({'version':version,'commit':a.sha,'sha256':digest,'bytes':merged.stat().st_size,'built_at':datetime.datetime.now(datetime.timezone.utc).isoformat()},indent=2)+'\n')
+assert merged.read_bytes()[0]==0xe9
+assert 65536 < merged.stat().st_size < 16*1024*1024
+with (out/'SHA256SUMS').open('a') as f: f.write(digest+'  '+merged.name+'\n')
+slave_name='2dk_uart_tx_v1.bin'
+slave=base64.b64decode(''.join((root/'type2dk'/f'{slave_name}.b64').read_text().split()),validate=True)
+expected=(root/'type2dk/UART_SHA256SUMS.txt').read_text().split()[0]
+assert hashlib.sha256(slave).hexdigest()==expected
+assert sum(struct.unpack_from('<8I',slave)) & 0xffffffff == 0
+assert struct.unpack_from('<I',slave,32)[0]==0x98447902
+assert struct.unpack_from('<I',slave,40)[0]==binascii.crc32(slave[:40]) & 0xffffffff
+image_info=struct.unpack_from('<I',slave,36)[0]
+assert image_info+32==len(slave)
+assert struct.unpack_from('<I',slave,image_info)[0]==0xBB0110BB
+assert struct.unpack_from('<I',slave,image_info+12)[0]==len(slave)
+(out/slave_name).write_bytes(slave)
+with (out/'SHA256SUMS').open('a') as f: f.write(expected+'  '+slave_name+'\n')
+shutil.copyfile(root/'type2dk/UART_README.md',site/'UART_README.md')
+print('Packaged UART receiver and transmitter:',version,len(slave),expected)

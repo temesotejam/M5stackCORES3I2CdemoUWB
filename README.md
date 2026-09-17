@@ -1,5 +1,7 @@
 # CoreS3 × Type2DK I2C Check
 
+UART送信試験を追加しました：[書き込みページ](https://temesotejam.github.io/M5stackCORES3I2CdemoUWB/uart.html) / [手順と検証範囲](type2dk/UART_README.md)。PIO13 → GPIO2、38400 bps、通信確認用の試験データです。
+
 [ブラウザ書き込みページ](https://temesotejam.github.io/M5stackCORES3I2CdemoUWB/) · [ビルドと公開状況](https://github.com/temesotejam/M5stackCORES3I2CdemoUWB/actions)
 
 M5Stack CoreS3から、Type2DK診断版v5スレーブの16バイト応答を読み取る試験アプリです。測距・距離表示は行いません。ユーザー提供ログでCoreS3 1.1.0＋2DK v5の100 kHz設定で追加1000回すべて正常受信を確認しました。400 kHzと、以下の電源配線変更後の実機試験は未確認です。

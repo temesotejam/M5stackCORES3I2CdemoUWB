@@ -10,6 +10,7 @@
 </head>
 <body><main>
 <header><div class="eyebrow">M5STACK CORES3 / HARDWARE TEST</div><h1>2DKとのI2C通信を、<br>画面で確かめる。</h1><p>CoreS3をマスターにして、Type2DKのテスト応答を読み取ります。<br>100 kHzから始めて、400 kHzでの読み取りも確認できます。</p><span class="tag">SDA GPIO2</span><span class="tag">SCL GPIO1</span><span class="tag">Slave 0x42</span></header>
+<p class="note"><a href="./uart.html"><strong>UART送信試験はこちら</strong></a> — 今のSDA端子を使い、外付けプルアップなしで2DKからCoreS3へ送信します。</p>
 <div class="grid"><section class="card"><h2>01 / CoreS3へ書き込む</h2><p>PC版ChromeまたはEdgeで開き、データ通信対応USBケーブルでCoreS3を接続してください。</p>
 <esp-web-install-button manifest="./manifest.json"><button id="install" slot="activate" disabled>USBで接続して書き込む</button><span slot="unsupported">このブラウザはWeb Serialに対応していません。PC版Chrome／Edgeを使用してください。</span><span slot="not-allowed">HTTPSでこのページを開いてください。</span></esp-web-install-button>
 <p class="meta" id="build" aria-live="polite">ファームウェアを確認しています…</p><p class="note">CoreS3の現在のアプリを書き換えます。「Erase device」を選ぶと保存データも消去されます。接続できない場合はRESETを約3秒長押しし、緑のLED点灯後に離してから再接続してください。</p><p class="meta">書き込み後に画面が出ない場合は、RESETを短く押してください。</p></section>

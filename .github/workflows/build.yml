@@ -31,6 +31,8 @@ jobs:
           /tmp/slave_test
           gcc -std=c11 -Wall -Wextra -Werror test/slave_pinmux_test.c -o /tmp/slave_pinmux_test
           /tmp/slave_pinmux_test
+          g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -Iinclude test/uart_stream_test.cpp -o /tmp/uart_test
+          /tmp/uart_test
       - name: Build CoreS3 firmware
         run: pio run
       - name: Package browser firmware
