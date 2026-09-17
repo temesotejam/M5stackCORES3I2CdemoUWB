@@ -33,6 +33,9 @@ jobs:
           /tmp/slave_pinmux_test
           g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -Iinclude test/uart_stream_test.cpp -o /tmp/uart_test
           /tmp/uart_test
+          g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -Iinclude test/range_stream_test.cpp -o /tmp/range_test
+          /tmp/range_test
+          bash type2dk/ranging/validation/host/run_tests.sh
       - name: Build CoreS3 firmware
         run: pio run
       - name: Package browser firmware

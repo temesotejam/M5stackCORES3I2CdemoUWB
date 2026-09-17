@@ -132,3 +132,9 @@ v1〜v3はFUNC4（PWM0/PWM2）を選択する不具合がありました。正�
 v4の実機ログでアプリ実行・UART・FUNC5を確認済み。PSELID=0によりready=0になるが、v4はこの値でI2Cを停止していません。v5はSCL/SDAを3秒間GPIO入力として観測した後、FUNC5へ戻します。CHECKの個別判定と割り込み関連レジスタを追加し、信号到達とI2C内部の問題を切り分けます。その後のユーザー提供ログでACKと100 kHz設定の連続受信を確認しました。400 kHzは未確認です。
 
 [PIO12・PIO13の詳しい調査結果と一次資料](type2dk/PIO12_PIO13_I2C_audit.md)。ハードウェアの対応と、実機の通信成功は分けて判断します。
+
+## 実測UWBのUART表示版
+
+[書き込みページ](https://temesotejam.github.io/M5stackCORES3I2CdemoUWB/range.html)からCoreS3 1.3.0-rangeと3台分の2DKファームを入手できます。19番で直接得られる2距離と本体加速度を送信します。
+
+[配線・試験・再ビルド手順](type2dk/ranging/README.md)。38400 bpsの診断通信は実機確認済み。測距併用版は実機試験待ちです。

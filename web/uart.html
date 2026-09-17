@@ -6,7 +6,7 @@
 </style>
 <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
 </head><body><main>
-<header><div class="eyebrow">M5STACK CORES3 / TYPE2DK</div><h1>同じSDA端子から、<br>UARTで送る。</h1><p>2DKのPIO13 → CoreS3のGPIO2。信号1本とGNDで受信を確認します。</p><span class="tag">38,400 bps / 8N1</span><span class="tag">50フレーム/秒</span><span class="tag">外付けプルアップ不要</span><p class="note">通信確認用の試験データを送信する版です。距離測定・UWB通信は実行しません。実機確認はこれからです。</p></header>
+<header><div class="eyebrow">M5STACK CORES3 / TYPE2DK</div><h1>同じSDA端子から、<br>UARTで送る。</h1><p>2DKのPIO13 → CoreS3のGPIO2。信号1本とGNDで受信を確認します。</p><span class="tag">38,400 bps / 8N1</span><span class="tag">50フレーム/秒</span><span class="tag">外付けプルアップ不要</span><p class="note">通信確認用の試験データを送信する版です。距離測定・UWB通信は実行しません。38400 bpsで実機受信を確認済みです。</p><p><a href="range.html">実際のUWB距離を表示する版はこちら →</a></p></header>
 <section class="card wide"><h2>最初に：信号線を外して両方を更新</h2><p>電源を切り、CoreS3と2DKの間のSDA・SCL線をいったん外してください。I2C用に追加した2本のプルアップ抵抗と電源線も外します。基板の4組の電源ジャンパはそのままです。</p><p>CoreS3と2DKの両方をこのUART版へ更新してから接続します。</p></section>
 <div class="grid">
 <section class="card"><h2>01 / CoreS3受信版を書き込む</h2><p>PCのChromeまたはEdgeで開き、CoreS3をUSB接続します。</p>
@@ -22,7 +22,7 @@
 <table><thead><tr><th>表示</th><th>期待値</th></tr></thead><tbody><tr><td>OK / RATE</td><td>毎秒およそ50増加 / およそ50/s</td></tr><tr><td>BAD / MISS / DUP</td><td>0 / 0 / 0</td></tr><tr><td>FRAME_ERR / OVERFLOW</td><td>0 / 0</td></tr></tbody></table>
 <p>WAITING：正常受信待ち。NO DATA：最後の正常受信から500 ms超。RESET：2DKの再起動検出数です。</p><p>CoreS3のUSBシリアルを<strong>115200 bps</strong>で開き、<code>UART_STAT</code>を5～10行共有してください。2DKのUSBログも115200 bpsです。基板間の38400 bpsとは別です。</p><p class="meta">2DKのSW1を押すとBOOT,2DK_UART_TX_V1を表示し、UART_TXを毎秒出します。</p></section>
 <section class="card wide"><h2>ファイルと詳しい手順</h2><p><a href="UART_README.md">配線・ログ・検証範囲</a> · <a href="firmware/cores3-uart-merged.bin" download>CoreS3 UART統合BIN</a> · <a href="firmware/SHA256SUMS">SHA256</a> · <a href="https://github.com/temesotejam/M5stackCORES3I2CdemoUWB">ソースコード</a></p><p><a href="./index.html">従来のI2C試験ページ</a></p></section>
-<footer>CoreS3 1.2.0-uart / Type2DK UART TX v1 / 実機のUART受信・波形は未確認</footer>
+<footer>CoreS3 1.2.0-uart / Type2DK UART TX v1 / UART受信確認済み / 波形の外部測定は未実施</footer>
 </main><script type="module">
 try{const r=await fetch('./build-info-uart.json',{cache:'no-store'});if(!r.ok)throw Error('build-info');const b=await r.json();const f=await fetch('./manifest-uart.json',{cache:'no-store'});if(!f.ok)throw Error('manifest');await f.json();await Promise.race([customElements.whenDefined('esp-web-install-button'),new Promise((_,reject)=>setTimeout(()=>reject(Error('installer')),15000))]);document.querySelector('#build').textContent=`${b.version} · ${(b.bytes/1024).toFixed(0)} KB · ${b.built_at.slice(0,10)}`;document.querySelector('#install').disabled=false;}catch(e){document.querySelector('#build').textContent='読み込みに失敗しました。再読み込みしてください。';}
 </script></body></html>

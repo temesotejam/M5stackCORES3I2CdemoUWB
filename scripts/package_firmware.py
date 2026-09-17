@@ -62,3 +62,35 @@ assert struct.unpack_from('<I',slave,image_info+12)[0]==len(slave)
 with (out/'SHA256SUMS').open('a') as f: f.write(expected+'  '+slave_name+'\n')
 shutil.copyfile(root/'type2dk/UART_README.md',site/'UART_README.md')
 print('Packaged UART receiver and transmitter:',version,len(slave),expected)
+
+# Local UWB measurements over the same software UART.
+build=root/'.pio/build/cores3_range'
+merged=out/'cores3-range-merged.bin'
+subprocess.run([sys.executable,str(packages/'tool-esptoolpy/esptool.py'),'--chip','esp32s3','merge_bin','-o',str(merged),'--flash_mode','dio','--flash_freq','80m','--flash_size','16MB','0x0',str(build/'bootloader.bin'),'0x8000',str(build/'partitions.bin'),'0xe000',str(packages/'framework-arduinoespressif32/tools/partitions/boot_app0.bin'),'0x10000',str(build/'firmware.bin')],check=True)
+version='1.3.0-range+'+a.sha[:7]
+digest=hashlib.sha256(merged.read_bytes()).hexdigest()
+manifest={'name':'CoreS3 Type2DK UWB Ranging','version':version,'new_install_prompt_erase':True,'new_install_improv_wait_time':0,'builds':[{'chipFamily':'ESP32-S3','parts':[{'path':'firmware/cores3-range-merged.bin','offset':0}]}]}
+(site/'manifest-range.json').write_text(json.dumps(manifest,indent=2)+'\n')
+(site/'build-info-range.json').write_text(json.dumps({'version':version,'commit':a.sha,'sha256':digest,'bytes':merged.stat().st_size,'built_at':datetime.datetime.now(datetime.timezone.utc).isoformat()},indent=2)+'\n')
+assert merged.read_bytes()[0]==0xe9 and 65536<merged.stat().st_size<16*1024*1024
+with (out/'SHA256SUMS').open('a') as f: f.write(digest+'  '+merged.name+'\n')
+source=root/'type2dk/ranging'
+for line in (source/'firmware/SHA256SUMS.txt').read_text().splitlines():
+    expected,name=line.split()
+    slave=base64.b64decode(''.join((source/'firmware'/(name+'.b64')).read_text().split()),validate=True)
+    assert hashlib.sha256(slave).hexdigest()==expected
+    assert sum(struct.unpack_from('<8I',slave)) & 0xffffffff == 0
+    assert struct.unpack_from('<I',slave,32)[0]==0x98447902
+    assert struct.unpack_from('<I',slave,40)[0]==binascii.crc32(slave[:40]) & 0xffffffff
+    image_info=struct.unpack_from('<I',slave,36)[0]
+    assert image_info+32==len(slave) and struct.unpack_from('<I',slave,image_info)[0]==0xBB0110BB
+    assert struct.unpack_from('<I',slave,image_info+12)[0]==len(slave)
+    (out/name).write_bytes(slave)
+    with (out/'SHA256SUMS').open('a') as f: f.write(line+'\n')
+    print('Verified ranging image:',name,len(slave),expected)
+shutil.copyfile(source/'README.md',site/'RANGE_README.md')
+shutil.copytree(source/'licenses',site/'licenses',dirs_exist_ok=True)
+eula=site/'licenses/EULA.pdf.b64'
+(eula.with_suffix('')).write_bytes(base64.b64decode(''.join(eula.read_text().split()),validate=True))
+eula.unlink()
+print('Packaged ranging receiver:',version,digest)
